@@ -21,7 +21,7 @@
     GUID = '19D2C65F-520C-48CD-8E1C-4C58AE1A122F'
     
     # Author of this module
-    Author = 'Scott Epperly'
+    Author = 'Scott Epperly, Allan Miller'
     
     # Company or vendor of this module
     CompanyName = 'Microsoft'
