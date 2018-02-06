@@ -20,8 +20,8 @@ Import-Module ..\MppScripter.psd1 -Force;
 
 #-- SQL Authention for APS --
 $cred = Get-Credential;
-#$DBConnection = Get-MppConnection -ServerInstance "<aps_ip_address>,17001" -DatabaseName "<database_name>" -Credential $cred;
-$DBConnection = Get-MppConnection -ServerInstance "10.209.223.143,17001" -DatabaseName "InlineSelectTest" -Credential $cred;
+$DBConnection = Get-MppConnection -ServerInstance "<aps_ip_address>,17001" -DatabaseName "<database_name>" -Credential $cred;
+
 
 #--============================--
 #-- Script all objects to file --

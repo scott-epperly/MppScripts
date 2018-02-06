@@ -18,8 +18,13 @@ Table scripts include:
 Each of these programmability objects are scripted using the sys.sql_modules DMV.  It currently supports up to 80K
 characters, which is 800 lines of 100 characters.  This should support scripts that exceed the 1000 lines, but may truncate extremely large scripts.  Please validate script of any large stored procedures in your environment.
 
+## Known Issues
+* Scripter takes a long time when a large number of objects are scripted
+
 ## vNext (proposed)
 * Add support for DEFAULT constraints in table script
+* Script Schemas
+* Get-MppDatabaseScript: returns a CREATE DATABASE script
 * Get-MppLoginScript: returns scripts for instance-level logins, including server role membership and login permissions
 * Get-MppDatabaseUserScript: returns scripts for database-level users, including database role membership and user permissions.
 * Get-MppDatabaseRoleScript: returns user-defined database roles and respective permissions.  Membership to be handled by Get-MppUserScript

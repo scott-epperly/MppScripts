@@ -1,40 +1,40 @@
-﻿function Get-MppObjectScript
+﻿##############################
+#.SYNOPSIS
+#Gets scripts for database object in Azure SQL Data Warehouse or an Analytics Platform System appliance.
+#
+#.DESCRIPTION
+#The Get-MppScript cmdlet will return object(s) with a Script property that contains the object script.
+#
+#Supported Object Types:
+#Tables
+#    Secondary Indexes
+#    Statistics
+#Views
+#Stored Procedures
+#User Defined Functions
+#
+#Unsupported Features:
+#Default constraints
+#Security (Logins, Users, Roles, GRANT/DENY)
+#
+#.PARAMETER MppConnection
+#.Net SqlConnection object that is opened against a DW database.  This is commonly
+#
+#.PARAMETER ObjectName
+#Object name(s) for which scripts will be created and returned.  If not specified, all objects in the database will be returned.
+#
+#.EXAMPLE
+#$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
+#Get-MppScript -MppConnection $conn
+#$conn.Close()
+#
+#.EXAMPLE
+#$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
+#Get-MppScript -MppConnection $conn -ObjectName "dbo.MyObjectName"
+#$conn.Close()
+##############################
+function Get-MppObjectScript
 {
-<#
-.SYNOPSIS
-Gets scripts for database object in Azure SQL Data Warehouse or an Analytics Platform System appliance.
-
-.DESCRIPTION
-The Get-MppScript cmdlet will return object(s) with a Script property that contains the object script.
-
-Supported Object Types:
-Tables
-    Secondary Indexes
-    Statistics
-Views
-Stored Procedures
-User Defined Functions
-
-Unsupported Features:
-Default constraints
-Security (Logins, Users, Roles, GRANT/DENY)
-
-.PARAMETER MppConnection
-.Net SqlConnection object that is opened against a DW database.  This is commonly
-
-.PARAMETER ObjectName
-Object name(s) for which scripts will be created and returned.  If not specified, all objects in the database will be returned.
-
-.EXAMPLE
-$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
-Get-MppScript -MppConnection $conn
-$conn.Close()
-
-.EXAMPLE
-$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
-Get-MppScript -MppConnection $conn -ObjectName "dbo.MyObjectName"
-$conn.Close()
-#>
     [CmdletBinding(DefaultParametersetName="Command")]
     Param (
         [Parameter(Mandatory=$true)]
@@ -197,7 +197,7 @@ $conn.Close()
     from sys.tables t
         join sys.indexes i
             on t.object_id = i.object_id
-            --and i.index_id <= 1
+            and i.index_id <= 1
         join sys.index_columns ic
             on i.object_id = ic.object_id
             and i.index_id = ic.index_id
@@ -361,9 +361,9 @@ $conn.Close()
 
                 # Partition Info
                 $partition_info = "";
-                $part_range_vals = $tblPartitionInfo | ForEach-Object{"`r`n`t,[$($_.boundary_value)]"};
+                $part_range_vals = $tblPartitionInfo | ForEach-Object{"`r`n`t,$($_.boundary_value)"};
                 if ($part_range_vals.Length -gt 0) {
-                    $str_part_range_vals = ([string]::Concat($part_range_vals));
+                    $str_part_range_vals = ([string]::Concat($part_range_vals)).substring(4);
                     $partition_info = ", PARTITION ($($tblPartitionInfo[0].partition_column_name) RANGE $(if ($tblPartitionInfo[0].boundary_value_on_right) {"RIGHT"} else {"LEFT"} ) FOR VALUES($str_part_range_vals))"
                 }
 
@@ -371,29 +371,31 @@ $conn.Close()
                 # Secondary Index Info
                 $index_id = 0;
                 $index_stub = "";
-                $index_cols = "";
+                [System.Collections.ArrayList]$index_cols = @();
                 $index_info = "";
                 $lst_index_info = $tblSecondaryIndexInfo | ForEach-Object{
                     if($index_id -ne $_.index_id) {
                         # Output CREATE INDEX string
                         if($index_stub -ne "") {
-                            $index_cols = $index_cols.substring(1)
-                            $index_out = $index_stub -replace "<index_cols>", $index_cols;
+                            $str_index_cols = [string]::Concat($index_cols.ToArray()).substring(1);
+                            $index_cols.Clear();
+                            $index_out = $index_stub -replace "<index_cols>", $str_index_cols;
                             $index_out;
                         }
                         
-                        $index_stub = "`r`nCREATE INDEX [$($_.index_name)] on [$DatabaseName].[$($tblTableBase.schema_name)].[$($tblTableBase.table_name)] (<index_cols> );`r`nGO";
-                        $index_cols = ", $($_.column_name) $(if($_.is_descending_key) {"DESC"} else {"ASC"})"
+                        $index_stub = "`r`nCREATE INDEX [$($_.index_name)] on [$($tblTableBase.schema_name)].[$($tblTableBase.table_name)] (<index_cols> );`r`nGO";
+                        [void]$index_cols.Add(", $($_.column_name) $(if($_.is_descending_key) {"DESC"} else {"ASC"})");
                     }
                     else {
-                        $index_cols += ", $($_.column_name) $(if($_.is_descending_key) {"DESC"} else {"ASC"})"
+                        [void]$index_cols.Add(", $($_.column_name) $(if($_.is_descending_key) {"DESC"} else {"ASC"})");
                     }
                     $index_id = $_.index_id;
                 }
                 # Gather info from the last record
-                if ($index_cols.Length -gt 0) {
-                    $index_cols = $index_cols.substring(1)
-                    $lst_index_info += $index_stub -replace "<index_cols>", $index_cols;
+                if ($index_cols.Count -gt 0) {
+                    $str_index_cols = [string]::Concat($index_cols.ToArray()).substring(1);
+                    $index_cols.Clear();
+                    $lst_index_info += $index_stub -replace "<index_cols>", $str_index_cols;
                 }
                 # Write out generated statement if there is anything to write out
                 if ($lst_index_info.count -gt 0) {
@@ -404,28 +406,30 @@ $conn.Close()
                 # Stats Info
                 $stats_id = 0;
                 $stats_stub = "";
-                $stats_cols = "";
+                [System.Collections.ArrayList]$stats_cols = @();
                 $stats_info = "";
                 $lst_stats_info = $tblStatsInfo | ForEach-Object{
                     if($stats_id -ne $_.stats_id) {
-                        # Output CREATE INDEX string
+                        # Output CREATE STATISTICS string
                         if($stats_stub -ne "") {
-                            $stats_cols = $stats_cols.substring(1)
-                            $stats_out = $stats_stub -replace "<stats_cols>", $stats_cols;
+                            $str_stats_cols = [string]::Concat($stats_cols.ToArray()).substring(1);
+                            $stats_cols.Clear();
+                            $stats_out = $stats_stub -replace "<stats_cols>", $str_stats_cols;
                             $stats_out;
                         }
                         
-                        $stats_stub = "`r`nCREATE STATISTICS [$($_.stats_name)] on [$DatabaseName].[$($tblTableBase.schema_name)].[$($tblTableBase.table_name)] (<stats_cols> )$(if ($_.has_filter) {" WHERE $($_.filter_definition)"});`r`nGO";
-                        $stats_cols = ", $($_.column_name)"
+                        $stats_stub = "`r`nCREATE STATISTICS [$($_.stats_name)] on [$($tblTableBase.schema_name)].[$($tblTableBase.table_name)] (<stats_cols> )$(if ($_.has_filter) {" WHERE $($_.filter_definition)"});`r`nGO";
+                        [void]$stats_cols.Add(", $($_.column_name)");
                     }
                     else {
-                        $stats_cols += ", $($_.column_name)"
+                        [void]$stats_cols.Add(", $($_.column_name)");
                     }
                     $stats_id = $_.stats_id;
                 }
                 if ($stats_cols.Length -gt 0) {
-                    $stats_cols = $stats_cols.substring(1)
-                    $lst_stats_info += $stats_stub -replace "<stats_cols>", $stats_cols;
+                    $str_stats_cols = [string]::Concat($stats_cols.ToArray()).substring(1);
+                    $stats_cols.Clear();
+                    $lst_stats_info += $stats_stub -replace "<stats_cols>", $str_stats_cols;
                 }
                 if ($lst_stats_info.count -gt 0) {
                     $stats_info = ([string]::Concat($lst_stats_info));
@@ -433,16 +437,7 @@ $conn.Close()
 
 
                 # Compile the script
-                $script = @"
-CREATE TABLE [$DatabaseName].[$($tblTableBase.schema_name)].[$($tblTableBase.table_name)]
-( 
-    $str_column_list
-)  
-WITH ( DISTRIBUTION=$distribution_type, $storage_type $partition_info);
-GO
-$index_info
-$stats_info
-"@;
+                $script = "CREATE TABLE [$($tblTableBase.schema_name)].[$($tblTableBase.table_name)]`r`n(`r`n`t$str_column_list`r`n)`r`nWITH ( DISTRIBUTION=$distribution_type, $storage_type $partition_info);`r`nGO`r`n$index_info`r`n$stats_info`r`n";
                     
             }
             elseif ($_.type.Trim() -in "P","V","FN") {
@@ -497,7 +492,7 @@ $conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Datab
 Get-MppScript -MppConnection $conn -ObjectName "dbo.MyObjectName"
 $conn.Close()
 #>
-    [CmdletBinding(DefaultParametersetName="Command")]
+    [CmdletBinding()]
     param (
         [Parameter(Mandatory=$true)]
         [string]$ServerInstance,
@@ -543,54 +538,47 @@ $conn.Close()
 }
 
 function runSql {
-    [CmdletBinding(DefaultParametersetName="Command")]
+    [CmdletBinding()]
     param (
         [ValidateScript({$_.State -eq "Open"})]
         [object]$DBConnection,
-        
-        [parameter(Mandatory=$false, ParameterSetName="Command")]
         [String]$Query,
-
-        $Variable,
-        
-        [Switch]$NonQuery
+        $Variable,        
+        [Switch]$NonQuery,
+        [Switch]$AutoClose
     )
     begin {}
 
     process {
-        #try {
-            if ($PSCmdlet.ParameterSetName -eq "Command") {
-                #Process statements
-                $sql = $Query               
+        $sql = $Query               
+        
+        if ($NonQuery) {
+            foreach ($statement in [regex]::Split($sql, "GO")) {
+                $DBCommand = New-Object System.Data.SqlClient.SqlCommand($statement, $DBConnection)
+                $DBCommand.ExecuteNonQuery()
             }
-            else {
-                #Process file
-                $sql = Get-Content -Path $InputScript -Raw
-            }
-            
-            if ($NonQuery) {
-                foreach ($statement in [regex]::Split($sql, "GO")) {
-                    $DBCommand = New-Object System.Data.SqlClient.SqlCommand($statement, $DBConnection)
-                    $DBCommand.ExecuteNonQuery()
+        }
+        else {
+            $DBCommand = New-Object System.Data.SqlClient.SqlCommand($sql, $DBConnection)
+            $DBCommand.CommandTimeout = 300; #Setting timeout to 5 minutes.
+            if($Variable.count -gt 0) {
+                $Variable.Keys | ForEach-Object {
+                    $DBCommand.Parameters.AddWithValue($_, [string]$Variable.Item($_)) | Out-Null;
                 }
             }
-            else {
-                $DBCommand = New-Object System.Data.SqlClient.SqlCommand($sql, $DBConnection)
-                
-                if($Variable.count -gt 0) {
-                    $Variable.Keys | ForEach-Object {
-                        $DBCommand.Parameters.AddWithValue($_, [string]$Variable.Item($_)) | Out-Null;
-                    }
-                }
 
-                $DBAdapter = New-Object -TypeName System.Data.SqlClient.SqlDataAdapter
-                $DBDataSet = New-Object -TypeName System.Data.DataSet
-                $DBAdapter.SelectCommand = $DBCommand
+            $DBAdapter = New-Object -TypeName System.Data.SqlClient.SqlDataAdapter
+            $DBDataSet = New-Object -TypeName System.Data.DataSet
+            $DBAdapter.SelectCommand = $DBCommand
 
-                $DBAdapter.Fill($DBDataSet) | Out-Null
-                $DBDataSet
-            }
-        #} catch {}
+            $DBAdapter.Fill($DBDataSet) | Out-Null
+            $DBDataSet
+        }
     }
-    end {}
+    end {
+        if ($AutoClose) {
+            $DBConnection.Close();
+            $DBConnection.Dispose();
+        }
+    }
 }
