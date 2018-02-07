@@ -1,7 +1,13 @@
 # MppScripter Module
 The MppScripter module was created to fill a gap in the ability to create database object scripts in mass againstAzure SQL Data Warehouse or an Analytics Platform System (APS - aka Parallel Data Warehouse (PDW)) database.
 
-## Supported Features - v.1.0.0
+## Release Log
+### v1.0.1
+* Improved performance when scripting a large number of objects
+* Corrected a number of initial release bugs
+### v1.0.0
+* Initial Release
+## Supported Features
 All objects will include the database name in the script; this is currently not optional
 
 ### Tables, Secondary Indexes, & Statistics
@@ -19,11 +25,11 @@ Each of these programmability objects are scripted using the sys.sql_modules DMV
 characters, which is 800 lines of 100 characters.  This should support scripts that exceed the 1000 lines, but may truncate extremely large scripts.  Please validate script of any large stored procedures in your environment.
 
 ## Known Issues
-* Scripter takes a long time when a large number of objects are scripted
+* Scripter takes a long time when a large number of objects are scripted (beta fix in place)
 
 ## vNext (proposed)
 * Add support for DEFAULT constraints in table script
-* Script Schemas
+* Get-MppSchemaScript: returns CREATE SCHEMA scripts
 * Get-MppDatabaseScript: returns a CREATE DATABASE script
 * Get-MppLoginScript: returns scripts for instance-level logins, including server role membership and login permissions
 * Get-MppDatabaseUserScript: returns scripts for database-level users, including database role membership and user permissions.

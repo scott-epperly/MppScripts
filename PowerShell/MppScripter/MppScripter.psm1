@@ -321,13 +321,13 @@ function Get-MppObjectScript
             $object_id = $_.object_id;
 
             # Filter tables for current object
-            $tblTableBase = $ds.Tables[1] | Where-Object{$_.object_id -eq $object_id};
-            $tblClusteredIndexCols = $ds.Tables[2] | Where-Object{$_.object_id -eq $object_id};
-            $tblColumnInfo = $ds.Tables[3] | Where-Object{$_.object_id -eq $object_id};
-            $tblPartitionInfo = $ds.Tables[4] | Where-Object{$_.object_id -eq $object_id};
-            $tblStatsInfo = $ds.Tables[5] | Where-Object{$_.object_id -eq $object_id};
-            $tblSecondaryIndexInfo = $ds.Tables[6] | Where-Object{$_.object_id -eq $object_id};
-            $tblProgrammability = $ds.Tables[7] | Where-Object{$_.object_id -eq $object_id};
+            $tblTableBase = $ds.Tables[1].select("object_id='$object_id'");
+            $tblClusteredIndexCols = $ds.Tables[2].select("object_id='$object_id'");
+            $tblColumnInfo = $ds.Tables[3].select("object_id='$object_id'");
+            $tblPartitionInfo = $ds.Tables[4].select("object_id='$object_id'");
+            $tblStatsInfo = $ds.Tables[5].select("object_id='$object_id'");
+            $tblSecondaryIndexInfo = $ds.Tables[6].select("object_id='$object_id'");
+            $tblProgrammability = $ds.Tables[7].select("object_id='$object_id'");
 
             # Create Script output - User Tables
             if ($_.type.Trim() -eq "U") {
