@@ -25,7 +25,13 @@ $DBConnection = Get-MppConnection -ServerInstance "<logical_server_name>.databas
 #--==================================--
 #-- Script objects to separate files --
 #--==================================--
-$x = Get-MppObjectScript -MppConnection $DBConnection -ObjectName "dbo.DimProduct", "dbo.FactSales"
+$s = Get-MppSchemaScript -MppConnection $DBConnection -SchemaName "stg"
+$s | ForEach-Object{
+    $path = "C:\temp\scripts\$($_.SchemaName).sql";
+    $_.Script | Out-File $path -Force -Confirm:$false;
+}
+
+$x = Get-MppObjectScript -MppConnection $DBConnection -ObjectName "dbo.DimProduct", "dbo.FactSales", "stg.Sales2017"
 $x | ForEach-Object{
     $path = "C:\temp\scripts\$($_.SchemaName).$($_.ObjectName).sql";
     $_.Script | Out-File $path -Force -Confirm:$false;

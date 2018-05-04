@@ -2,9 +2,12 @@
 The MppScripter module was created to fill a gap in the ability to create database object scripts in mass against Azure SQL Data Warehouse or an Analytics Platform System (APS - aka Parallel Data Warehouse (PDW)) database.
 
 ## Release Log
+### v1.0.3
+* Added Get-MppSchemaScript to enable schema script support
+* Corrected cmdlet documentation
+* Updated samples
 ### v1.0.2
 * Added support for default constraints on columns
-
 ### v1.0.1
 * Improved performance when scripting a large number of objects
 * Corrected a number of initial release bugs
@@ -31,7 +34,6 @@ characters, which is 800 lines of 100 characters.  This should support scripts t
 * None! . . . at least, yet :)!
 
 ## vNext (proposed)
-* Get-MppSchemaScript: returns CREATE SCHEMA scripts
 * Get-MppDatabaseScript: returns a CREATE DATABASE script
 * Get-MppLoginScript: returns scripts for instance-level logins, including server role membership and login permissions
 * Get-MppUserScript: returns scripts for database-level users, including database role membership and user permissions.

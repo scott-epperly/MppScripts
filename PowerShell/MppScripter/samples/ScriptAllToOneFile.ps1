@@ -31,6 +31,13 @@ if (Test-Path $path) {
     Remove-Item $path -Force -Confirm:$false -ErrorAction:Continue;
 }
 
+# Script out Schemas First
+$s = Get-MppSchemaScript -MppConnection $DBConnection
+$s | ForEach-Object{
+    $_.Script | Out-File $path -Append -Force -Confirm:$false;
+}
+
+# Script out everything else (this could be filtered by object Type on the ForEach-Object if you want to force the object order)
 $x = Get-MppObjectScript -MppConnection $DBConnection
 $x | ForEach-Object{
     $_.Script | Out-File $path -Append -Force -Confirm:$false;

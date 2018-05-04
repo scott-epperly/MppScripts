@@ -3,19 +3,17 @@
 #Gets scripts for database object in Azure SQL Data Warehouse or an Analytics Platform System appliance.
 #
 #.DESCRIPTION
-#The Get-MppScript cmdlet will return object(s) with a Script property that contains the object script.
+#The Get-MppObjectScript cmdlet will return object(s) with a Script property that contains the object script.
 #
 #Supported Object Types:
 #Tables
 #    Secondary Indexes
 #    Statistics
+#    Default Constraints
 #Views
 #Stored Procedures
 #User Defined Functions
 #
-#Unsupported Features:
-#Default constraints
-#Security (Logins, Users, Roles, GRANT/DENY)
 #
 #.PARAMETER MppConnection
 #.Net SqlConnection object that is opened against a DW database.  This is commonly
@@ -25,12 +23,12 @@
 #
 #.EXAMPLE
 #$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
-#Get-MppScript -MppConnection $conn
+#Get-MppObjectScript -MppConnection $conn
 #$conn.Close()
 #
 #.EXAMPLE
 #$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
-#Get-MppScript -MppConnection $conn -ObjectName "dbo.MyObjectName"
+#Get-MppObjectScript -MppConnection $conn -ObjectName "dbo.MyObjectName"
 #$conn.Close()
 ##############################
 function Get-MppObjectScript
@@ -468,8 +466,85 @@ function Get-MppObjectScript
     }
 }
 
+##############################
+#.SYNOPSIS
+#Gets scripts for non-default database schemas in Azure SQL Data Warehouse or an Analytics Platform System appliance.
+#
+#.DESCRIPTION
+#The Get-MppSchemaScript cmdlet will return object(s) with a Script property that contains the schema script.
+#
+#
+#.PARAMETER MppConnection
+#.Net SqlConnection object that is opened against a DW database.  This is commonly
+#
+#.PARAMETER ObjectName
+#Object name(s) for which scripts will be created and returned.  If not specified, all objects in the database will be returned.
+#
+#.EXAMPLE
+#$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
+#Get-MppSchemaScript -MppConnection $conn
+#$conn.Close()
+#
+#.EXAMPLE
+#$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
+#Get-MppSchemaScript -MppConnection $conn -SchemaName "stg"
+#$conn.Close()
+##############################
+function Get-MppSchemaScript
+{
+    [CmdletBinding(DefaultParametersetName="Command")]
+    Param (
+        [Parameter(Mandatory=$true)]
+        [object]$MppConnection
+        ,[string[]]$SchemaName
+    )
 
-# Helper Functions
+    begin{
+        $DatabaseName = $MppConnection.Database;
+    }
+
+    Process {
+        
+
+        # Get list of all objects if none were specified
+        if(!$SchemaName) {
+            $qryScriptInfo = "select schema_id, name as schema_name, 'Schema' as type from sys.schemas where name not in ('dbo', 'INFORMATION_SCHEMA', 'sys')";
+        }
+        else {
+            $ObjectSelect = $SchemaName | ForEach-Object{",'$_'"}
+            $qryScriptInfo = "select schema_id, name as schema_name, 'Schema' as type from sys.schemas where name in (" + ([string]::Concat($ObjectSelect)).substring(1) + ");";
+        }
+
+        # Retrieve metadata from database
+        $params=@{
+            "DBConnection"=$MppConnection;
+            "Query"=$qryScriptInfo;
+        }
+        Write-Progress -Activity "Retrieving metadata from database . . .";
+        $ds = runsql @params;
+
+        # Script the objects
+        $cntr = 0
+        $ds.Tables[0] | ForEach-Object{
+            $cntr++;
+            Write-Progress -Activity "Scripting Schemas" -Status "$($_.schema_name)" -PercentComplete ($cntr/$ds.Tables[0].Rows.Count*100)
+
+            $script = "CREATE SCHEMA [$($_.schema_name)];`r`nGO"
+            
+            $objProp = @{
+                "SchemaId"=$_.schema_id;
+                "SchemaName"=$_.schema_name;
+                "ObjectType"=$_.type;
+                "Script"=$script;
+            }
+            New-Object -TypeName psobject -Property $objProp;
+        }
+    }
+}
+
+#--==================--
+#-- Helper Functions --
+#--==================--
 function Get-MppConnection {
 <#
 .SYNOPSIS
