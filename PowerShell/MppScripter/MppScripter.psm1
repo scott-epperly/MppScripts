@@ -145,6 +145,7 @@ function Get-MppObjectScript
                 end
                 + ')'
         end as size
+        ,df.definition as default_definition
     from #ObjectList ol
         join sys.tables t
             on ol.object_id = t.object_id
@@ -152,6 +153,9 @@ function Get-MppObjectScript
             on t.object_id = c.object_id
         join sys.types typ
             on c.user_type_id = typ.user_type_id
+        left join sys.default_constraints df
+			on t.object_id = df.parent_object_id
+			and c.column_id = df.parent_column_id
     order by t.object_id, c.column_id;
             
             
@@ -332,7 +336,7 @@ function Get-MppObjectScript
             # Create Script output - User Tables
             if ($_.type.Trim() -eq "U") {
                 # Column List
-                $column_list = $tblColumnInfo | ForEach-Object{"`r`n`t,[$($_.column_name)] $($_.data_type_name)$($_.size)$(if($_.collation_name.length -gt 1) {" COLLATE $($_.collation_name)"})$(if ($_.is_nullable) {" NOT"}) NULL"};
+                $column_list = $tblColumnInfo | ForEach-Object{"`r`n`t,[$($_.column_name)] $($_.data_type_name)$($_.size)$(if($_.collation_name.length -gt 1) {" COLLATE $($_.collation_name)"})$(if ($_.is_nullable) {" NOT"}) NULL$(if ($_.default_definition) {" DEFAULT " + $_.default_definition})"};
                 $str_column_list = ([string]::Concat($column_list)).substring(4);
 
 

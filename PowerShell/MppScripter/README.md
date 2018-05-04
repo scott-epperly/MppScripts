@@ -1,7 +1,10 @@
 # MppScripter Module
-The MppScripter module was created to fill a gap in the ability to create database object scripts in mass againstAzure SQL Data Warehouse or an Analytics Platform System (APS - aka Parallel Data Warehouse (PDW)) database.
+The MppScripter module was created to fill a gap in the ability to create database object scripts in mass against Azure SQL Data Warehouse or an Analytics Platform System (APS - aka Parallel Data Warehouse (PDW)) database.
 
 ## Release Log
+### v1.0.2
+* Added support for default constraints on columns
+
 ### v1.0.1
 * Improved performance when scripting a large number of objects
 * Corrected a number of initial release bugs
@@ -25,14 +28,13 @@ Each of these programmability objects are scripted using the sys.sql_modules DMV
 characters, which is 800 lines of 100 characters.  This should support scripts that exceed the 1000 lines, but may truncate extremely large scripts.  Please validate script of any large stored procedures in your environment.
 
 ## Known Issues
-* Scripter takes a long time when a large number of objects are scripted (beta fix in place)
+* None! . . . at least, yet :)!
 
 ## vNext (proposed)
-* Add support for DEFAULT constraints in table script
 * Get-MppSchemaScript: returns CREATE SCHEMA scripts
 * Get-MppDatabaseScript: returns a CREATE DATABASE script
 * Get-MppLoginScript: returns scripts for instance-level logins, including server role membership and login permissions
-* Get-MppDatabaseUserScript: returns scripts for database-level users, including database role membership and user permissions.
+* Get-MppUserScript: returns scripts for database-level users, including database role membership and user permissions.
 * Get-MppDatabaseRoleScript: returns user-defined database roles and respective permissions.  Membership to be handled by Get-MppUserScript
 * Scripting options:
     * Include/Exclude database name
@@ -42,7 +44,8 @@ characters, which is 800 lines of 100 characters.  This should support scripts t
     * Include/Exclude user defined statistics
     * Script USE <database>
     * Check for object existence
+* Support Source/Target comparison
 
 
 ## Contributing
-We look forward to making this scrpiting tool better for everyone!  Please contribute where you can - code, documentation, and more samples are welcome!
+We look forward to making this scripting tool better for everyone!  Please contribute where you can - code, documentation, and more samples are welcome!

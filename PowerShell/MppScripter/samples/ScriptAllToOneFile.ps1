@@ -27,7 +27,9 @@ $DBConnection = Get-MppConnection -ServerInstance "<aps_ip_address>,17001" -Data
 #-- Script all objects to file --
 #--============================--
 $path = "C:\temp\scripts\MyTestDatabase.sql";
-Remove-Item $path -Force -Confirm:$false -ErrorAction:Continue;
+if (Test-Path $path) {
+    Remove-Item $path -Force -Confirm:$false -ErrorAction:Continue;
+}
 
 $x = Get-MppObjectScript -MppConnection $DBConnection
 $x | ForEach-Object{
