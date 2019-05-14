@@ -82,14 +82,42 @@ function Get-MppObjectScript
             where cdp.object_id = t.object_id
                 and cdp.distribution_ordinal = 1
         ) as hash_distribution_column_name
+        ,isnull(ext.is_external_table, 0) as is_external_table
+        ,ext.location
+        ,ext.external_data_source_name
+        ,ext.external_file_format_name
+        ,ext.reject_type
+        ,ext.reject_value
+        ,ext.reject_sample_value
+        ,ext.rejected_row_location
     from #ObjectList ol
         join sys.tables t
             on ol.object_id = t.object_id
         join sys.indexes i
             on t.object_id = i.object_id
             and i.index_id <= 1
-        join sys.pdw_table_distribution_properties tdp
+        left join sys.pdw_table_distribution_properties tdp
             on t.object_id = tdp.object_id
+        left join (
+            select
+                et.object_id
+                ,1 as is_external_table
+                ,et.location
+                ,eds.name as external_data_source_name
+                ,eff.name as external_file_format_name
+                ,et.reject_type
+                ,et.reject_value
+                ,et.reject_sample_value
+                ,et.rejected_row_location
+            from sys.external_tables et
+                join sys.external_data_sources eds
+                    on et.data_source_id = eds.data_source_id
+                join sys.external_file_formats eff
+                    on et.file_format_id = eff.file_format_id
+            where et.type = 'U'
+                and et.is_ms_shipped = 0
+        ) ext
+            on t.object_id = ext.object_id
     where
         t.type = 'U'
         and t.is_ms_shipped = 0;
@@ -296,6 +324,8 @@ function Get-MppObjectScript
         join sys.sql_modules sm
             on o.object_id = sm.object_id
     where o.type in ('P', 'V', 'FN');
+
+    -- 
 "@;
         # Get list of all objects if none were specified
         if(!$ObjectName) {
@@ -437,9 +467,27 @@ function Get-MppObjectScript
                     $stats_info = ([string]::Concat($lst_stats_info));
                 }
 
+                # External Table Reject Options 
+                if ($tblTableBase.reject_type -eq "VALUE") {
+                    $external_reject_info = ", REJECT_TYPE = $($tblTableBase.reject_type), REJECT_VALUE = $($tblTableBase.reject_value) "
+                }
+                if ($tblTableBase.reject_type -eq "PERCENTAGE") {
+                    $external_reject_info = ", REJECT_TYPE = $($tblTableBase.reject_type), REJECT_SAMPLE_VALUE = $($tblTableBase.reject_sample_value) "
+                }
+                if( !([System.DBNull]::Value).Equals($tblTableBase.rejected_row_location) ) {
+                    $external_reject_info = "$external_reject_info, REJECTED_ROW_LOCATION = '$($tblTableBase.rejected_row_location)' "
+                }
+
 
                 # Compile the script
-                $script = "CREATE TABLE [$($tblTableBase.schema_name)].[$($tblTableBase.table_name)]`r`n(`r`n`t$str_column_list`r`n)`r`nWITH ( DISTRIBUTION=$distribution_type, $storage_type $partition_info);`r`nGO`r`n$index_info`r`n$stats_info`r`n";
+                if ($tblTableBase.is_external_table -eq 1) {
+                        # External Table script
+                        $script = "CREATE EXTERNAL TABLE [$($tblTableBase.schema_name)].[$($tblTableBase.table_name)]`r`n(`r`n`t$str_column_list`r`n)`r`nWITH ( LOCATION = '$($tblTableBase.location)', DATA_SOURCE = $($tblTableBase.external_data_source_name), FILE_FORMAT = $($tblTableBase.external_file_format_name) $external_reject_info);`r`nGO`r`n$index_info`r`n$stats_info`r`n";
+                }
+                else {
+                        # User Table (Materialized) script
+                        $script = "CREATE TABLE [$($tblTableBase.schema_name)].[$($tblTableBase.table_name)]`r`n(`r`n`t$str_column_list`r`n)`r`nWITH ( DISTRIBUTION=$distribution_type, $storage_type $partition_info);`r`nGO`r`n$index_info`r`n$stats_info`r`n";
+                }
                     
             }
             elseif ($_.type.Trim() -in "P","V","FN") {
@@ -450,8 +498,11 @@ function Get-MppObjectScript
                     $tblProgrammability.def16 + $tblProgrammability.def17 + $tblProgrammability.def18 + $tblProgrammability.def19 + $tblProgrammability.def20 +
                     "`r`nGO";
             }
+            elseif ($_.type.Trim() -in "D") {
+                # Do nothing - defaults are handled in the table creation scripts.
+            }
             else {
-                $script = "Database object not found; Unable to generate script."
+                $script = "Unable to generate script; object type $($_.type.Trim()) not currently supported"
             }
 
             $objProp = @{
@@ -475,7 +526,7 @@ function Get-MppObjectScript
 #
 #
 #.PARAMETER MppConnection
-#.Net SqlConnection object that is opened against a DW database.  This is commonly
+#.Net SqlConnection object that is opened against a DW database.
 #
 #.PARAMETER ObjectName
 #Object name(s) for which scripts will be created and returned.  If not specified, all objects in the database will be returned.
@@ -508,7 +559,7 @@ function Get-MppSchemaScript
 
         # Get list of all objects if none were specified
         if(!$SchemaName) {
-            $qryScriptInfo = "select schema_id, name as schema_name, 'Schema' as type from sys.schemas where name not in ('dbo', 'INFORMATION_SCHEMA', 'sys')";
+            $qryScriptInfo = "select schema_id, name as schema_name, 'Schema' as type from sys.schemas where name not in ('dbo', 'INFORMATION_SCHEMA', 'sys', 'sysdiag')";
         }
         else {
             $ObjectSelect = $SchemaName | ForEach-Object{",'$_'"}
@@ -535,6 +586,119 @@ function Get-MppSchemaScript
                 "SchemaId"=$_.schema_id;
                 "SchemaName"=$_.schema_name;
                 "ObjectType"=$_.type;
+                "Script"=$script;
+            }
+            New-Object -TypeName psobject -Property $objProp;
+        }
+    }
+}
+
+##############################
+#.SYNOPSIS
+#Gets scripts for EXTERNAL DATA SOURCEs in Azure SQL Data Warehouse or an Analytics Platform System appliance.
+#
+#.DESCRIPTION
+#The Get-MppExternalDataSourceScript cmdlet will return object(s) with a Script property that contains the schema script.
+#
+#
+#.PARAMETER MppConnection
+#.Net SqlConnection object that is opened against a DW database.
+#
+#.PARAMETER ObjectName
+#Object name(s) for which scripts will be created and returned.  If not specified, all external data sources in the database will be returned.
+#
+#.EXAMPLE
+#$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
+#Get-MppExternalDataSourceScript -MppConnection $conn
+#$conn.Close()
+#
+#.EXAMPLE
+#$conn = Get-MppConnection -ServerInstance "myserver.database.windows.net" -Databasename "MyDatabase" -Credential (Get-Credential);
+#Get-MppExternalDataSourceScript -MppConnection $conn -ExternalDataSourceName "MyExternalDataSource"
+#$conn.Close()
+##############################
+function Get-MppExternalDataSourceScript
+{
+    [CmdletBinding(DefaultParametersetName="Command")]
+    Param (
+        [Parameter(Mandatory=$true)]
+        [object]$MppConnection
+        ,[string[]]$ExternalDataSourceName
+    )
+
+    begin{
+        $DatabaseName = $MppConnection.Database;
+    }
+
+    Process {
+        
+
+        # Get list of all objects if none were specified
+        if(!$ExternalDataSourceName) {
+            $qryScriptInfo = @"
+        select
+            eds.data_source_id
+           ,eds.name as external_data_source_name
+           ,eds.location
+           ,eds.connection_options
+           ,dsc.name as database_scoped_credential_name
+           ,eds.pushdown
+           ,eds.type_desc
+           ,eds.resource_manager_location
+           ,eds.database_name
+           ,eds.shard_map_name
+       from sys.external_data_sources eds
+           join sys.database_scoped_credentials dsc
+               on eds.credential_id = dsc.credential_id;
+"@;
+        }
+        else {
+            $ObjectSelect = $ExternalDataSourceName | ForEach-Object{",'$_'"}
+            $qryScriptInfo = @"
+            select
+            eds.data_source_id
+           ,eds.name as external_data_source_name
+           ,eds.location
+           ,eds.connection_options
+           ,dsc.name as database_scoped_credential_name
+           ,eds.pushdown
+           ,eds.type_desc
+           ,eds.resource_manager_location
+           ,eds.database_name
+           ,eds.shard_map_name
+       from sys.external_data_sources eds
+           left join sys.database_scoped_credentials dsc
+               on eds.credential_id = dsc.credential_id
+            where eds.name in (
+"@ + ([string]::Concat($ObjectSelect)).substring(1) + ");";
+        }
+
+        # Retrieve metadata from database
+        $params=@{
+            "DBConnection"=$MppConnection;
+            "Query"=$qryScriptInfo;
+        }
+        Write-Progress -Activity "Retrieving metadata from database . . .";
+        $ds = runsql @params;
+
+        # Script the objects
+        $cntr = 0
+        $ds.Tables[0] | ForEach-Object{
+            $cntr++;
+            Write-Progress -Activity "Scripting External Data Source" -Status "$($_.external_data_source_name)" -PercentComplete ($cntr/$ds.Tables[0].Rows.Count*100)
+
+            $conn_options = if( !([System.DBNull]::Value).Equals($_.connection_options) ){", CONNECTION_OPTIONS = '$($_.connection_options)'"};
+            $cred = if( !([System.DBNull]::Value).Equals($_.database_scoped_credential_name) ){", CREDENTIAL = '$($_.database_scoped_credential_name)'"};
+            $rm_loc = if( !([System.DBNull]::Value).Equals($_.resource_manager_location) ){", RESOURCE_MANAGER_LOCATION = '$($_.resource_manager_location)'"};
+            $db_name = if( !([System.DBNull]::Value).Equals($_.database_name) ){", DATABASE_NAME = '$($_.database_name)'"};
+            $shard_map_name = if( !([System.DBNull]::Value).Equals($_.shard_map_name) ){", SHARD_MAP_NAME = '$($_.shard_map_name)'"};
+
+            $script = "CREATE EXTERNAL DATA SOURCE [$($_.external_data_source_name)] WITH (LOCATION = '$($_.location)' $conn_options $cred, PUSHDOWN = $($_.pushdown), TYPE = $($_.type_desc) $rm_loc $db_name $shard_map_name);`r`nGO"
+            
+            $objProp = @{
+                "DataSourceId"=$_.data_source_id;
+                "DataSourceName"=$_.external_data_source_name;
+                "ObjectType"="ExternalDataSource";
                 "Script"=$script;
             }
             New-Object -TypeName psobject -Property $objProp;

@@ -2,6 +2,10 @@
 The MppScripter module was created to fill a gap in the ability to create database object scripts in mass against Azure SQL Data Warehouse or an Analytics Platform System (APS - aka Parallel Data Warehouse (PDW)) database.
 
 ## Release Log
+### v1.0.4
+* Added support for external tables
+* Added Get-ExternalDataSource cmdlet
+* Mofied samples to demonstrate new cmdlet
 ### v1.0.3
 * Added Get-MppSchemaScript to enable schema script support
 * Corrected cmdlet documentation
@@ -25,13 +29,24 @@ Table scripts include:
 * Column nullability
 * Secondary Indexes
 * User Defined Statistics
+* Default constraints
+* External table detection/support
 
 ### Stored Procedures, Views, & User Defined Functions (UDFs)
 Each of these programmability objects are scripted using the sys.sql_modules DMV.  It currently supports up to 80K
 characters, which is 800 lines of 100 characters.  This should support scripts that exceed the 1000 lines, but may truncate extremely large scripts.  Please validate script of any large stored procedures in your environment.
 
+### Schemas
+
+### External Object Support
+* External Data Sources supported; more to come in the near future (see Next Release)
+
 ## Known Issues
-* None! . . . at least, yet :)!
+None that we know of!
+
+## Next Release
+* Get-MppExternalFileFormat: returns objects with script for CREATE EXTERNAL FILE FORMAT
+* Get-MppDatabaseScopedCredential: returns objects with script for CREATE DATABASE SCOPED CREDENTIAL
 
 ## vNext (proposed)
 * Get-MppDatabaseScript: returns a CREATE DATABASE script

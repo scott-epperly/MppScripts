@@ -38,6 +38,12 @@ $s | ForEach-Object{
 }
 
 # Script out everything else (this could be filtered by object Type on the ForEach-Object if you want to force the object order)
+$y = Get-MppExternalDataSourceScript -MppConnection $DBConnection
+$y | ForEach-Object{
+    $_.Script | Out-File $path -Append -Force -Confirm:$false;
+}
+
+# Script out everything else (this could be filtered by object Type on the ForEach-Object if you want to force the object order)
 $x = Get-MppObjectScript -MppConnection $DBConnection
 $x | ForEach-Object{
     $_.Script | Out-File $path -Append -Force -Confirm:$false;

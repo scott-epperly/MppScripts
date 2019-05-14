@@ -37,6 +37,12 @@ $x | ForEach-Object{
     $_.Script | Out-File $path -Force -Confirm:$false;
 }
 
+$y = Get-MppExternalDataSourceScript -MppConnection $DBConnection
+$y | ForEach-Object{
+    $path = "C:\temp\scripts\$($_.DataSourceName).sql";
+    $_.Script | Out-File $path -Force -Confirm:$false;
+}
+
 
 #--=====================--
 #-- Clean up connection --
