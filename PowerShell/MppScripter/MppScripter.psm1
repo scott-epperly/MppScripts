@@ -364,7 +364,7 @@ function Get-MppObjectScript
             # Create Script output - User Tables
             if ($_.type.Trim() -eq "U") {
                 # Column List
-                $column_list = $tblColumnInfo | ForEach-Object{"`r`n`t,[$($_.column_name)] $($_.data_type_name)$($_.size)$(if($_.collation_name.length -gt 1) {" COLLATE $($_.collation_name)"})$(if ($_.is_nullable) {" NOT"}) NULL$(if ($_.default_definition) {" DEFAULT " + $_.default_definition})"};
+                $column_list = $tblColumnInfo | ForEach-Object{"`r`n`t,[$($_.column_name)] $($_.data_type_name)$($_.size)$(if($_.collation_name.length -gt 1) {" COLLATE $($_.collation_name)"})$(if ($_.is_nullable) {" NOT"}) NULL$(if ($_.default_definition.ToString().Trim() -ne '') {" DEFAULT " + $_.default_definition})"};
                 $str_column_list = ([string]::Concat($column_list)).substring(4);
 
 
@@ -688,12 +688,12 @@ function Get-MppExternalDataSourceScript
             Write-Progress -Activity "Scripting External Data Source" -Status "$($_.external_data_source_name)" -PercentComplete ($cntr/$ds.Tables[0].Rows.Count*100)
 
             $conn_options = if( !([System.DBNull]::Value).Equals($_.connection_options) ){", CONNECTION_OPTIONS = '$($_.connection_options)'"};
-            $cred = if( !([System.DBNull]::Value).Equals($_.database_scoped_credential_name) ){", CREDENTIAL = '$($_.database_scoped_credential_name)'"};
+            $cred = if( !([System.DBNull]::Value).Equals($_.database_scoped_credential_name) ){", CREDENTIAL = $($_.database_scoped_credential_name)"};
             $rm_loc = if( !([System.DBNull]::Value).Equals($_.resource_manager_location) ){", RESOURCE_MANAGER_LOCATION = '$($_.resource_manager_location)'"};
             $db_name = if( !([System.DBNull]::Value).Equals($_.database_name) ){", DATABASE_NAME = '$($_.database_name)'"};
             $shard_map_name = if( !([System.DBNull]::Value).Equals($_.shard_map_name) ){", SHARD_MAP_NAME = '$($_.shard_map_name)'"};
 
-            $script = "CREATE EXTERNAL DATA SOURCE [$($_.external_data_source_name)] WITH (LOCATION = '$($_.location)' $conn_options $cred, PUSHDOWN = $($_.pushdown), TYPE = $($_.type_desc) $rm_loc $db_name $shard_map_name);`r`nGO"
+            $script = "CREATE EXTERNAL DATA SOURCE [$($_.external_data_source_name)] WITH (LOCATION = '$($_.location)' $conn_options $cred, TYPE = $($_.type_desc) $rm_loc $db_name $shard_map_name);`r`nGO"
             
             $objProp = @{
                 "DataSourceId"=$_.data_source_id;
